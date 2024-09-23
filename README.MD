@@ -6,7 +6,7 @@ A command-line interface (CLI) tool for managing Git and GitHub operations effic
 
 * [Requirements]
 
-**Install the gh utility with snap **:
+**Install the gh utility with snap**:
    ```bash
    sudo snap install gh
    ```
@@ -24,4 +24,8 @@ A command-line interface (CLI) tool for managing Git and GitHub operations effic
 **Clone the Repository**:
    ```bash
    git clone https://github.com/kurogane13/git_bash_interactvie_console.git
+
+   cd git_bash_interactvie_console
+   bash git_cli_console.sh
   ```
+
