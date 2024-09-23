@@ -1,5 +1,8 @@
 # GitHub CLI Tool
 
+## Author: Gustavo Wydler Azuaga
+## Release date: 09/23/2024
+
 - A command-line interface (CLI) tool for managing Git and GitHub operations efficiently. 
 - This tool simplifies the process of working with Git repositories, handling everything from authentication and branch management to commits, pushes, and merges.
 
