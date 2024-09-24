@@ -24,6 +24,112 @@ function gh_tool() {
 
 gh_tool
 
+function delete_remote_repo() {
+	
+	echo " "
+	read -p "Enter remote branch name to delete: " delete_remote_branch
+	echo
+	echo "Querying remote branch: $delete_remote_branch"
+	echo
+	gh repo view $delete_remote_branch
+	echo " "
+	gh repo delete $delete_remote_branch
+	echo " "
+	echo "Re-Querying remote branch: $delete_remote_branch"
+	echo
+	gh repo view $delete_remote_branch
+	echo
+	read -p "Press enter to return to the menu: " enter
+	
+}
+
+function create_remote_repo() {
+	echo " "
+	echo "Working on path/repo: $PWD"
+	echo " "
+
+	# Check if the remote already exists locally
+	if git remote get-url "$new_repo" &>/dev/null; then
+		echo "Fatal: Remote '$new_repo' already exists."
+	else
+		# Create the repository on GitHub using GitHub CLI
+		echo "Creating GitHub repository '$new_repo' for user '$git_username'..."
+		gh repo create
+		
+	fi
+	echo " "
+	read -p "Press enter to return to the menu: " enter
+	
+}
+
+function git_configure_account() {
+	
+	while true; do
+		echo " "
+		echo "Configure Git Submenu accessed"
+		echo " "
+		echo "1. Set Username"
+		echo "2. Set Email"
+		echo "3. List Git Configuration"
+		echo "4. Back to Main Menu"
+		echo " "
+		read -p "Select an option (1-4): " git_config_choice
+
+		case $git_config_choice in
+			1)
+				read -p "Enter your Git username: " git_username
+				git config --global user.name "$git_username"
+				;;
+			2)
+				read -p "Enter your Git email: " git_email
+				git config --global user.email "$git_email"
+				;;
+			3)
+				echo " "
+				echo "Listing git config: "
+				echo " "
+				git config --global --list
+				echo " "
+				read -p "Press enter to return to the menu: " enter
+				;;
+			4)
+				break
+				;;
+			*)
+				echo " "
+				echo "ERROR!"
+				echo "Invalid option. Please select an option from 1 to 4."
+				;;
+		esac
+	done
+	
+}
+
+function git_authentication() {
+	
+	echo " "
+	echo "Working on path/repo: "$PWD
+	echo " "
+	read -p "Enter GitHub repository URL: " repo_url
+	git remote set-url origin $repo_url
+	
+}
+
+function test_ssh_connection() {
+
+	echo " "
+	echo "Working on path/repo: "$PWD
+	echo " "
+	echo "SSH testing mode accessed."
+	echo " "
+	read -p "Press enter to test the ssh connection to git@github.com now: " enter
+	ssh -vT git@github.com
+	echo " "
+	read -p "Connection test finalized, press enter to get back to the main menu: " enter
+	echo " "
+	
+}
+
 main_program() {
   while true; do
     echo " "
@@ -52,7 +158,7 @@ main_program() {
     echo "16. Push to Branch"
     echo "17. Delete Local Branch"
     echo "18. Delete ALL Local Branches"
-    echo "19. Delete Remote Branch"
+    echo "19. Delete Remote Repo"
     echo "20. Show remote branch"
     echo "21. <--- Back to Initial menu"
     echo " "
@@ -64,63 +170,13 @@ main_program() {
 
     case $choice in
         1)
-          while true; do
-                  echo " "
-                  echo "Configure Git Submenu accessed"
-                  echo " "
-                  echo "1. Set Username"
-                  echo "2. Set Email"
-                  echo "3. List Git Configuration"
-                  echo "4. Back to Main Menu"
-                  echo " "
-                  read -p "Select an option (1-4): " git_config_choice
-
-                  case $git_config_choice in
-                      1)
-                          read -p "Enter your Git username: " git_username
-                          git config --global user.name "$git_username"
-                          ;;
-                      2)
-                          read -p "Enter your Git email: " git_email
-                          git config --global user.email "$git_email"
-                          ;;
-                      3)
-                          echo " "
-                          echo "Listing git config: "
-                          echo " "
-                          git config --global --list
-                          echo " "
-                          read -p "Press enter to return to the menu: " enter
-                          ;;
-                      4)
-                          break
-                          ;;
-                      *)
-                          echo " "
-                          echo "ERROR!"
-                          echo "Invalid option. Please select an option from 1 to 4."
-                          ;;
-                  esac
-              done
-              ;;
+			git_configure_account
+            ;;
         2)
-            echo " "
-            echo "Working on path/repo: "$PWD
-            echo " "
-            read -p "Enter GitHub repository URL: " repo_url
-            git remote set-url origin $repo_url
+			git_authentication
             ;;
         3)
-            echo " "
-            echo "Working on path/repo: "$PWD
-            echo " "
-            echo "SSH testing mode accessed."
-            echo " "
-            read -p "Press enter to test the ssh connection to git@github.com now: " enter
-            ssh -vT git@github.com
-            echo " "
-            read -p "Connection test finalized, press enter to get back to the main menu: " enter
-            echo " "
+			test_ssh_connection
             ;;
         4)
             echo " "
@@ -222,22 +278,7 @@ main_program() {
             read -p "Press enter to return to the menu: " enter
             ;;
         12)
-			echo " "
-			echo "Working on path/repo: $PWD"
-			echo " "
-
-			# Check if the remote already exists locally
-			if git remote get-url "$new_repo" &>/dev/null; then
-				echo "Fatal: Remote '$new_repo' already exists."
-			else
-				# Create the repository on GitHub using GitHub CLI
-				echo "Creating GitHub repository '$new_repo' for user '$git_username'..."
-				gh repo create
-				
-			fi
-			echo " "
-
-			read -p "Press enter to return to the menu: " enter
+			create_remote_repo
             ;;
         13)
             echo " "
@@ -404,20 +445,7 @@ main_program() {
             read -p "Press enter to return to the menu: " enter
             ;;
         19)
-            echo " "
-            read -p "Enter remote branch name to delete: " delete_remote_branch
-            echo
-            echo "Querying remote branch: $delete_remote_branch"
-            echo
-            gh repo view $delete_remote_branch
-            echo " "
-            gh repo delete $delete_remote_branch
-            echo " "
-            echo "Re-Querying remote branch: $delete_remote_branch"
-            echo
-            gh repo view $delete_remote_branch
-            echo
-            read -p "Press enter to return to the menu: " enter
+			delete_remote_repo
             ;;
         20) echo " "
             read -p "Enter remote branch name to show: " show_remote_branch
@@ -475,20 +503,31 @@ check_and_initialize_repository() {
           echo " "
           echo "-----------------------------------------------------------------------------------------------------------"
           echo
-          echo "1 - Search for a git branch using a regex"
-          echo "2 - Create a new branch in "$PWD
-          echo "3 - Provide a valid repo/directory to work with"
+          echo "1 - View/Configure Git account"
+          echo "2 - Test SSH Connection"
+          echo "3 - Search for a git branch using a regex"
+          echo "4 - Create a new local branch in "$PWD
+          echo "5 - Create a remote Repo"
+          echo "6 - Delete a remote Repo"
+          echo "7 - Provide a valid LOCAL repo/directory to work with"
           echo " "
           read -p "Select an option : " choice
           case $choice in
-			  1)
+          
+              1)
+                git_configure_account
+                ;;
+              2)
+                test_ssh_connection
+                ;;
+			  3)
 			    echo " "
 			    search_git_branch
 			    echo " "
                 read -p "Press enter to go to the main menu program: " enter
                 check_and_initialize_repository
 			    ;;
-              2)
+              4)
                 echo " "
                 read -p "Enter initial branch name: " branch_name
                 git init $branch_name
@@ -509,7 +548,13 @@ check_and_initialize_repository() {
                 read -p "Press enter to go to the main menu program: " enter
                 main_program
                 ;;
-              3)
+              5)
+                create_remote_repo
+                ;;
+              6)
+                delete_remote_repo
+                ;;
+              7)
                 echo " "
                 echo "Copy and paste the name of the repo/branch you want to work with, without the ./ "
                 echo "Example: ./Doe/.git. - Doe"
