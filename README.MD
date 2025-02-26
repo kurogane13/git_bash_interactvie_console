@@ -54,7 +54,7 @@
       - Select the Paste an authentication token option
       - The program will look for the identity of the gh authenticated user in: $HOME/snap/gh/502/.config/gh/hosts.yml
       - It will extract the user id from it
-      - It will identify theuser and match it with the user found in the .ssh/config file, following the pattern github.com-$userx
+      - It will identify the user and match it with the user found in the .ssh/config file, following the pattern github.com-$userx
       - Once it matches the user, the Identity file will be sent to a symlink (~/.ssh/current_github_key), which will be generated
       - The ssh query (ssh -T git@github.com) runs to attempt validating the correct user.
 
