@@ -60,7 +60,7 @@
 
 ## Table of Contents
 
-* Requirements
+* Requirements needed to run the program
 
 **Install the gh utility with snap**:
    ```bash
