@@ -44,22 +44,105 @@ function delete_remote_repo() {
 }
 
 function create_remote_repo() {
-	echo " "
-	echo "Working on path/repo: $PWD"
-	echo " "
+    echo " "
+    echo "Working on path/repo: $PWD"
+    echo
+    eval "$(ssh-agent -s)"
+	ssh-add -D
+    read -p "Provide the name of the repo you want to create: " repo_name
 
-	# Check if the remote already exists locally
-	if git remote get-url "$new_repo" &>/dev/null; then
-		echo "Fatal: Remote '$new_repo' already exists."
-	else
-		# Create the repository on GitHub using GitHub CLI
-		echo "Creating GitHub repository '$new_repo' for user '$git_username'..."
-		gh repo create
-		
-	fi
-	echo " "
-	read -p "Press enter to return to the menu: " enter
-	
+    if [[ -d "$repo_name" ]]; then 
+        echo
+        echo "Repo '$repo_name' already exists."
+
+        if [[ -d "$repo_name/.git" ]]; then
+            echo
+            echo "Repo '$repo_name' is already initialized."
+            echo
+            read -p "You cannot create this repo, because it already exists. Press enter to return to the main menu: " enter
+            main_program
+        else
+            echo "Directory exists but is not a Git repo. Initializing..."
+            cd "$repo_name" || exit
+            git init
+        fi
+    else
+        echo
+        echo "Creating local directory '$repo_name'..."
+        mkdir -p "$repo_name"
+        cd "$repo_name" || exit
+        echo
+        echo "Initializing new Git repository in '$repo_name'..."
+        git init
+    fi
+
+    # Detect default branch name (master or main)
+    default_branch=$(git symbolic-ref --short HEAD 2>/dev/null)
+    if [[ -z "$default_branch" ]]; then
+        default_branch="master"  # Fallback to master
+    fi
+
+	# Extract GitHub username dynamically
+    github_user=$(ssh -T git@github.com 2>&1 | grep -oP "(?<=Hi ).*?(?=! You've successfully)")
+
+    if [[ -z "$github_user" ]]; then
+        echo "Failed to determine GitHub username. Ensure you have SSH access configured."
+        echo
+        read -p "Press enter to return to the menu: "
+        return
+    fi
+    
+    # Create and commit README.md
+    current_date=$(date +"%m/%d/%Y")
+    cat <<EOF > README.md
+# 📅 Date Created: $current_date
+
+---
+
+# $repo_name
+
+Welcome to the **$repo_name** repository! 🎉
+
+## 📌 About This Project
+This repository serves as a starting point for version-controlled projects.  
+Feel free to modify and expand upon it as needed.
+
+## 🚀 Getting Started
+
+1. Clone this repository:
+   \`\`\`bash
+   git clone https://github.com/$github_user/$repo_name.git
+   \`\`\`
+2. Navigate into the directory:
+   \`\`\`bash
+   cd $repo_name
+   \`\`\`
+
+##
+---
+💡 *Happy coding! 🚀*
+EOF
+    git add README.md
+    git commit -m "Initial commit"
+
+    # Create the remote repository on GitHub
+    echo
+    echo "Creating GitHub repository '$repo_name'..."
+    gh repo create "$repo_name" --public --source=. --remote=upstream
+
+    # Construct the correct remote repository URL
+    remote_url="git@github.com:$github_user/$repo_name.git"
+
+    # Add the correct remote URL
+    git remote add origin "$remote_url"
+
+    # Push the initial commit using the correct branch
+    echo
+    echo "Pushing initial commit to '$remote_url'..."
+    git push -u origin "$default_branch"
+
+    echo " "
+    read -p "Press enter to return to the menu: "
 }
 
 function git_configure_account() {
@@ -123,11 +206,279 @@ function test_ssh_connection() {
 	echo "SSH testing mode accessed."
 	echo " "
 	read -p "Press enter to test the ssh connection to git@github.com now: " enter
+	eval "$(ssh-agent -s)"
+	ssh-add -D
 	ssh -vT git@github.com
 	echo " "
 	read -p "Connection test finalized, press enter to get back to the main menu: " enter
 	echo " "
 	
+}
+
+# Function to prompt for directory and check if it exists
+function get_directory() {
+    read -p "Enter the directory path: " repo_dir
+
+    if [[ ! -d "$repo_dir" ]]; then
+        read -p "Directory does not exist. Do you want to create it? (y/n): " create_dir
+        if [[ "$create_dir" == "y" || "$create_dir" == "Y" ]]; then
+            mkdir -p "$repo_dir"
+            echo "Directory $repo_dir created."
+        else
+            echo "Directory does not exist. Exiting."
+            exit 1
+        fi
+    fi
+
+    cd "$repo_dir" || { echo "Failed to access $repo_dir. Exiting."; exit 1; }
+}
+
+# Function to check if the directory is a Git repository and initialize if necessary
+function check_git_repo() {
+    if [[ ! -d ".git" ]]; then
+        echo "This directory is not a Git repository. Initializing..."
+        git init
+    fi
+}
+
+# Function to check if a remote repository exists on GitHub
+function check_remote_repo_exists() {
+    remote_url=$(git remote get-url origin 2>/dev/null)
+
+    if [[ -z "$remote_url" ]]; then
+        echo "No remote repository configured for this directory."
+        read -p "Enter the GitHub repository name (e.g., user/repo): " repo_name
+
+        echo "Checking if the repository exists on GitHub..."
+        if gh repo view "$repo_name" &>/dev/null; then
+            echo "Remote repository '$repo_name' found. Setting up local repo..."
+            git remote add origin "git@github.com:$repo_name.git"
+        else
+            read -p "Remote repository does not exist. Do you want to create it? (y/n): " create_repo
+            if [[ "$create_repo" == "y" || "$create_repo" == "Y" ]]; then
+                echo "Creating GitHub repository '$repo_name'..."
+                gh repo create "$repo_name" --public --source=. --remote=origin
+            else
+                echo "No remote repository available. Exiting."
+                exit 1
+            fi
+        fi
+    fi
+}
+
+# Function to pull from the remote repository
+function pull_from_remote() {
+    echo " "
+    echo "Pull from remote branch menu accessed."
+    echo " "
+    get_directory
+    check_git_repo
+    check_remote_repo_exists
+    echo
+    echo "Showing current branch:"
+    echo " "
+    git branch
+    echo
+    read -p "Press enter to pull from Remote Branch: "
+    echo
+    echo "Checking connection to GitHub..."
+    eval "$(ssh-agent -s)"
+    ssh -T git@github.com || { echo "GitHub authentication failed. Exiting."; return 1; }
+    echo " "
+    git pull origin "$(git branch --show-current)"
+    
+    echo " "
+    read -p "Press enter to return to the menu: "
+}
+
+# Function to push to the remote repository
+function push_to_remote() {
+    echo " "
+    echo "Push to remote branch menu accessed."
+    echo " "
+
+    get_directory
+    check_git_repo
+    check_remote_repo_exists
+	echo
+    echo "Showing current branch:"
+    echo " "
+    git branch
+    echo " "
+    read -p "Press enter to push to the Remote Branch: "
+    echo
+    echo "Setting up SSH authentication for GitHub..."
+    echo
+    git config --global url."git@github.com:".insteadOf "https://github.com/"
+    echo
+    eval "$(ssh-agent -s)"
+    ssh -T git@github.com || { echo "GitHub authentication failed. Exiting."; return 1; }
+    echo " "
+    current_branch=$(git branch --show-current)
+    git push --set-upstream origin "$current_branch"
+    echo " "
+    read -p "Press enter to return to the menu: "
+}
+
+function create_local_branch() {
+    echo
+    read -p "Enter the path to the local repository: " repo_dir
+
+    # Check if the directory exists
+    if [[ ! -d "$repo_dir" ]]; then
+        echo "Error: Directory does not exist."
+        read -p "Do you want to create this directory? (y/n): " create_dir
+        if [[ "$create_dir" == "y" ]]; then
+            mkdir -p "$repo_dir"
+            echo "Created directory: $repo_dir"
+        else
+            echo "Operation aborted."
+            return 1
+        fi
+    fi
+
+    # Navigate to the repository directory
+    cd "$repo_dir" || { echo "Error: Failed to access $repo_dir. Exiting."; return 1; }
+
+    # Check if it's a Git repository
+    if [[ ! -d ".git" ]]; then
+        echo "This is not a Git repository."
+        read -p "Do you want to initialize a Git repository here? (y/n): " init_git
+        if [[ "$init_git" == "y" ]]; then
+            git init
+            echo "Initialized new Git repository in $repo_dir."
+        else
+            echo "Operation aborted."
+            return 1
+        fi
+    fi
+
+    # Ensure the repository has an initial commit
+    if [[ -z $(git rev-parse --verify HEAD 2>/dev/null) ]]; then
+        echo "Repository has no commits. Creating an initial commit..."
+        touch README.md
+        git add README.md
+        git commit -m "Initial commit" > /dev/null 2>&1
+        echo "Initial commit created."
+    fi
+
+    echo
+    echo "Working in repository: $PWD"
+    echo
+
+    # Prompt for branch name
+    read -p "Enter the name of the local branch to create: " local_branch
+    echo
+
+    # Create and switch to the new branch
+    git checkout -b "$local_branch"
+    echo "Branch '$local_branch' created successfully."
+    echo
+
+    # List available branches
+    echo "Listing all branches:"
+    echo "---------------------"
+    git branch
+    echo
+
+    read -p "Press enter to return to the menu: "
+}
+
+function delete_local_branch() {
+    echo
+    read -p "Enter the path to the local repository: " repo_dir
+
+    # Ensure the provided path exists
+    if [[ ! -d "$repo_dir" ]]; then
+        echo "Error: Directory '$repo_dir' does not exist. Exiting."
+        echo
+        read -p "Press enter to return to the menu: "
+        return
+    fi
+
+    # Navigate to the repository directory
+    cd "$repo_dir" || { echo "Error: Failed to access $repo_dir. Exiting."; return 1; }
+
+    # Ensure it's a Git repository
+    if [[ ! -d ".git" ]]; then
+        echo "Error: This is not a Git repository. Exiting."
+        echo
+        read -p "Press enter to return to the menu: "
+        return
+    fi
+
+    echo
+    echo "Working in repository: $PWD"
+    echo
+
+    # List local branches
+    local_branches=$(git branch --format="%(refname:short)")
+
+    if [[ -z "$local_branches" ]]; then
+        echo "No local branches found in this repository."
+        echo
+        read -p "Press enter to return to the menu: "
+        return
+    fi
+
+    echo "Available branches:"
+    echo "-------------------"
+    echo "$local_branches"
+    echo
+
+    # Prompt user for branch to delete
+    read -p "Copy and paste the branch name to delete: " delete_branch
+    echo
+
+    # Ensure the branch exists before attempting to delete
+    if git rev-parse --verify "$delete_branch" >/dev/null 2>&1; then
+        read -p "Are you sure you want to delete branch '$delete_branch' in $PWD? (y/n): " confirm_delete
+        echo
+
+        if [[ "$confirm_delete" == "y" ]]; then
+            # Get current branch
+            current_branch=$(git rev-parse --abbrev-ref HEAD)
+
+            # If deleting the currently checked-out branch (including master)
+            if [[ "$current_branch" == "$delete_branch" ]]; then
+                echo "WARNING: You are trying to delete the currently checked-out branch '$delete_branch'."
+                echo "To proceed, a temporary branch 'temp_branch' will be created."
+                read -p "Continue? (y/n): " confirm_temp
+                if [[ "$confirm_temp" != "y" ]]; then
+                    echo "Branch deletion aborted."
+                    read -p "Press enter to return to the menu: "
+                    return
+                fi
+
+                # Create and switch to a temporary branch
+                git checkout -b temp_branch
+                echo "Switched to 'temp_branch'. Now deleting '$delete_branch'..."
+            fi
+
+            # Delete the target branch
+            git branch -D "$delete_branch"
+            echo "Branch '$delete_branch' has been deleted."
+
+            # If `master` was deleted, ask if they want to rename temp_branch
+            if [[ "$delete_branch" == "master" ]]; then
+                echo
+                read -p "Master branch was deleted. Do you want to rename 'temp_branch' to 'master'? (y/n): " rename_master
+                if [[ "$rename_master" == "y" ]]; then
+                    git branch -m master
+                    echo "Branch 'temp_branch' has been renamed to 'master'."
+                else
+                    echo "You are now on 'temp_branch'."
+                fi
+            fi
+        else
+            echo "Branch deletion aborted."
+        fi
+    else
+        echo "Error: Branch '$delete_branch' does not exist in this repository."
+    fi
+
+    echo
+    read -p "Press enter to return to the menu: "
 }
 
 main_program() {
@@ -154,8 +505,8 @@ main_program() {
     echo "12. Create Remote Repo"
     echo "13. Add Files"
     echo "14. Commit"
-    echo "15. Pull from Remote Branch"
-    echo "16. Push to Branch"
+    echo "15. Pull from Remote Repo"
+    echo "16. Push to Remote repo"
     echo "17. Delete Local Branch"
     echo "18. Delete ALL Local Branches"
     echo "19. Delete Remote Repo"
@@ -264,18 +615,7 @@ main_program() {
             read -p "Press enter to return to the menu: " enter
             ;;
         11)
-            echo " "
-            echo "Working on path/repo: "$PWD
-            echo " "
-            read -p "Enter local branch name to create: " local_branch
-            echo " "
-            git branch $local_branch
-            echo " "
-            echo "Listing branches "
-            echo " "
-            git branch
-            echo " "
-            read -p "Press enter to return to the menu: " enter
+            create_local_branch
             ;;
         12)
 			create_remote_repo
@@ -323,88 +663,13 @@ main_program() {
             read -p "Press enter to return to the menu: " enter
             ;;
         15)
-            echo " "
-            echo "Working on path/repo: "$PWD
-            echo " "
-            echo "Pull from remote branch menu accessed. "
-            echo " "
-            echo "Showing current branch: "
-            echo " "
-            git branch
-            read -p "Press enter to pull from Remote Branch: "
-            echo " "
-            git pull
-            read -p "Press enter to return to the menu: " enter
+            pull_from_remote
             ;;
         16)
-            echo " "
-            echo "Working on path/repo: "$PWD
-            echo " "
-            echo "Push to remote Branch menu accessed: "
-            echo " "
-            echo "Showing current branch: "
-            echo " "
-            git branch
-            echo " "
-            read -p "Press enter to push to the from Remote Branch: "
-            echo " "
-            git config --global url."git@github.com:".insteadOf "https://github.com/"
-            echo
-            ssh -T git@github.com
-            echo
-            git push --set-upstream origin master
-            echo " "
-            read -p "Press enter to return to the menu: " enter
+            push_to_remote
             ;;
         17)
-			echo " "
-			echo "Working on path/repo: $PWD"
-			echo " "
-			echo "Showing current branch: "
-			echo " "
-			git branch
-			echo " "
-
-			# Prompt for branch name to delete
-			read -p "Enter local branch name to delete: " delete_local_branch
-			echo
-			confirm_delete_all_branches() {
-				
-				# Check if the branch exists
-				if git show-ref --verify --quiet refs/heads/"$delete_local_branch"; then
-					read -p "Do you want to delete the branch '$delete_local_branch' in $PWD: y/n?: " confirm_delete
-					echo
-
-					if [ "$confirm_delete" == 'y' ]; then
-						echo "Creating temp branch for deletion 'temp-branch-for-deletion'... "
-						echo
-						git checkout -b temp-branch-for-deletion
-						echo
-						echo "Deleting branch: $delete_local_branch, except temp-branch-for-deletion... "
-						echo
-						git branch -D $delete_local_branch
-						echo
-						echo "Deleted except 'temp-branch-for-deletion'."
-					    echo
-						
-					elif [ "$confirm_delete" == 'n' ]; then
-						echo
-						echo "Aborted the deletion of $delete_local_branch in $PWD"
-						echo
-					else
-						echo
-						read -p "Invalid reply. Press enter to go back to the prompt: " enter
-						echo
-						confirm_delete_all_branches
-					fi
-				else
-					echo
-					echo "Branch '$delete_local_branch' does not exist in $PWD."
-				fi
-			}
-			confirm_delete_all_branches
-			echo
-			read -p "Press enter to return to the menu: " enter
+			delete_local_branch
             ;;
             
 	    18)
@@ -460,7 +725,7 @@ main_program() {
         *)
             echo " "
             echo "ERROR!"
-            echo "Invalid option. Please select an option from 1 to 16."
+            echo "Invalid option. Please select a valid option from the menu."
             ;;
     esac
 done
@@ -479,6 +744,139 @@ search_git_branch() {
   read -p "Press enter to go to the start menu: " enter
   echo
   check_and_initialize_repository
+}
+
+
+gh_authentication_menu() {
+
+	# Colors for styling
+	green="\e[32m"
+	blue="\e[34m"
+	yellow="\e[33m"
+	red="\e[31m"
+	reset="\e[0m"
+
+	# Function to authenticate with GitHub using gh
+	#authenticate_account() {
+	#	echo -e "${blue}\nAuthenticating GitHub account with gh...${reset}\n"
+	#	gh auth login --hostname github.com --git-protocol ssh
+	#	echo -e "${green}Authentication successful!${reset}\n"
+	#}
+	
+	authenticate_account() {
+		echo -e "${blue}\nAuthenticating GitHub account with gh...${reset}\n"
+
+		gh auth login --hostname github.com --git-protocol ssh
+
+		# Correct GitHub CLI config path
+		GH_CONFIG_FILE="$HOME/snap/gh/502/.config/gh/hosts.yml"
+
+		if [[ ! -f "$GH_CONFIG_FILE" ]]; then
+			echo -e "${red}Error: GitHub CLI config file not found at $GH_CONFIG_FILE.${reset}"
+			return 1
+		fi
+
+		# Retrieve the logged-in GitHub username
+		logged_git_user=$(grep 'user:' "$GH_CONFIG_FILE" | awk '{print $2}' | tr -d ' ')
+
+		# Retrieve the OAuth token
+		logged_git_oauth_token=$(grep 'oauth_token:' "$GH_CONFIG_FILE" | awk '{print $2}')
+
+		# Correct SSH key path
+		key_path="$HOME/.ssh/id_ed25519_${logged_git_user}"
+
+		# Check if the key file exists
+		if [[ ! -f "$key_path" ]]; then
+			echo -e "${red}Error: No valid SSH key found for $logged_git_user at $key_path.${reset}"
+			echo -e "${yellow}Ensure you have an SSH key added and registered with GitHub.${reset}"
+			return 1
+		fi
+
+		echo -e "${green}Authentication successful! Using SSH key: $key_path.${reset}\n"
+
+		# Remove existing symlink if it exists
+		if [[ -L "$HOME/.ssh/current_github_key" ]]; then
+			rm "$HOME/.ssh/current_github_key"
+		fi
+
+		# Create a new symlink to the SSH key
+		ln -sf "$key_path" "$HOME/.ssh/current_github_key"
+
+		# Ensure the SSH agent is running
+		if ! pgrep -u "$USER" ssh-agent > /dev/null; then
+			echo -e "${blue}Starting SSH agent...${reset}"
+			eval "$(ssh-agent -s)"
+		fi
+
+		# Remove all existing SSH keys and add the correct one
+		ssh-add -D > 2&>1 /dev/null
+		ssh-add "$HOME/.ssh/current_github_key" > 2&>1 /dev/null
+
+		# Debugging
+		echo -e "\n${yellow}Verifying SSH key content:${reset}"
+		ls -lha "$HOME/.ssh/current_github_key"
+
+		# Test SSH connection with GitHub
+		ssh -T git@github.com
+	}
+
+	# Function to switch GitHub identity using gh
+	switch_account() {
+		echo -e "${blue}\nSwitching GitHub account...${reset}\n"
+		read -p "Enter GitHub username to switch to: " username
+		read -p "Enter GitHub email for $username: " email
+		
+		echo -e "${yellow}\nLogging in with gh...${reset}\n"
+		gh auth login --hostname github.com --git-protocol ssh
+		
+		git config --global user.name "$username"
+		git config --global user.email "$email"
+		
+		echo -e "${yellow}Testing SSH connection...${reset}\n"
+		eval "$(ssh-agent -s)"
+		ssh -T git@github.com
+		
+		echo -e "${green}Switched to $username!${reset}\n"
+	}
+
+	# Function to display current GitHub identity
+	show_identity() {
+		echo -e "${blue}\nCurrent GitHub Identity:${reset}\n"
+		gh auth status
+	}
+
+	# Function to clone a repository using gh
+	clone_repo() {
+		echo -e "${blue}\nCloning a repository...${reset}\n"
+		read -p "Enter GitHub repository URL (https or SSH): " repo_url
+		gh repo clone "$repo_url"
+		echo -e "${green}Repository cloned successfully!${reset}\n"
+	}
+
+	# Menu loop
+	while true; do
+		echo
+		echo -e "${green}\n========= GitHub Account Manager (gh) =========${reset}"
+		echo
+		echo -e "${yellow}1) gh tool - Authenticate to remote GitHub Account${reset}"
+		echo -e "${yellow}2) Switch GitHub Account locally ${reset}"
+		echo -e "${yellow}3) Show Current GitHub Identity${reset}"
+		echo -e "${yellow}4) Clone Repository${reset}"
+		echo -e "${yellow}5) Exit${reset}\n"
+		read -p "Choose an option: " choice
+
+		case $choice in
+			1) authenticate_account ;;
+			2) switch_account ;;
+			3) show_identity ;;
+			4) clone_repo ;;
+			5) echo -e "${green}Goodbye!${reset}"; break;;
+			*) echo -e "${red}Invalid option. Try again.${reset}\n" ;;
+		esac
+
+	done
+	
+	
 }
 
 check_and_initialize_repository() {
@@ -503,31 +901,37 @@ check_and_initialize_repository() {
           echo " "
           echo "-----------------------------------------------------------------------------------------------------------"
           echo
-          echo "1 - View/Configure Git account"
-          echo "2 - Test SSH Connection"
-          echo "3 - Search for a git branch using a regex"
-          echo "4 - Create a new local branch in "$PWD
-          echo "5 - Create a remote Repo"
-          echo "6 - Delete a remote Repo"
-          echo "7 - Provide a valid LOCAL repo/directory to work with"
+          echo "1 - gh remote and local account authentication menu"
+          echo "2 - View/Configure Git account locally"
+          echo "3 - Test SSH Connection"
+          echo "4 - Search for a git branch using a regex"
+          echo "5 - Create a new local branch in "$PWD
+          echo "6 - Create a remote Repo"
+          echo "7 - Delete a remote Repo"
+          echo "8 - Provide a valid LOCAL repo/directory to work with"
+          echo "9 - Main program operations"
           echo " "
           read -p "Select an option : " choice
           case $choice in
           
               1)
+                gh_authentication_menu
+                ;;
+              
+              2)
                 git_configure_account
                 ;;
-              2)
+              3)
                 test_ssh_connection
                 ;;
-			  3)
+			  4)
 			    echo " "
 			    search_git_branch
 			    echo " "
                 read -p "Press enter to go to the main menu program: " enter
                 check_and_initialize_repository
 			    ;;
-              4)
+              5)
                 echo " "
                 read -p "Enter initial branch name: " branch_name
                 git init $branch_name
@@ -548,13 +952,13 @@ check_and_initialize_repository() {
                 read -p "Press enter to go to the main menu program: " enter
                 main_program
                 ;;
-              5)
+              6)
                 create_remote_repo
                 ;;
-              6)
+              7)
                 delete_remote_repo
                 ;;
-              7)
+              8)
                 echo " "
                 echo "Copy and paste the name of the repo/branch you want to work with, without the ./ "
                 echo "Example: ./Doe/.git. - Doe"
@@ -571,10 +975,13 @@ check_and_initialize_repository() {
                   check_and_initialize_repository
                 fi
                 ;;
+              9)
+                main_program
+                ;;
               *)
                 echo " "
                 echo "ERROR!"
-                echo "Invalid option. Please select either 1 or 2."
+                echo "Invalid option. Please select a valid option from the menu."
                 ;;
           esac
         done
