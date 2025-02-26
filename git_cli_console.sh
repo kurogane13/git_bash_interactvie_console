@@ -818,6 +818,18 @@ gh_authentication_menu() {
 
 		# Test SSH connection with GitHub
 		ssh -T git@github.com
+		echo
+		echo "Configured commiter username is: "
+		echo
+		git config --global user.email
+		echo
+		echo "Configured commiter email is: " 
+		echo
+		git config --global user.name
+		echo
+		echo "Remember you can change the comitter data in option 2, from the github account manager menu"
+		echo
+		read -p "Press enter to return to the main menu: " enter
 	}
 
 	# Function to switch GitHub identity using gh
@@ -843,6 +855,19 @@ gh_authentication_menu() {
 	show_identity() {
 		echo -e "${blue}\nCurrent GitHub Identity:${reset}\n"
 		gh auth status
+		echo
+		echo "Configured commiter username is: "
+		echo
+		git config --global user.email
+		echo
+		echo "Configured commiter email is: " 
+		echo
+		git config --global user.name
+		echo
+		echo "Remember you can change the comitter data in option 2, from the github account manager menu"
+		echo
+		read -p "Press enter to return to the main menu: " enter
+		
 	}
 
 	# Function to clone a repository using gh
