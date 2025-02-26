@@ -10,7 +10,7 @@
 
 ## Included in this new version:
 
-* **Dependencies**:
+* **Some of the new important features**:
   - gh authentication with ssh
   - gh switcher to switch between github accounts or identities
   - Enahnced validation for creation and deletion of repos an branches in functions
@@ -45,6 +45,7 @@
   ```
   - How this works:
   
+    - The identity files or key files in the config file shown above, should start with the following syntax: ~/.ssh/id_ed25519_username_here
     - Everytime you wish to switch to a different account or user:
     
       - The gh auth login instance will start
