@@ -626,6 +626,89 @@ create_remote_branch() {
     echo "✅ Remote branch 'origin/$branch_name' has been created successfully."
 }
 
+delete_untracked_branches() {
+    echo
+    read -rp "Enter the path to the Git repository (Press Enter to use current directory): " repo_path
+    repo_path=${repo_path:-$PWD}  # Default to current directory if empty
+    repo_path=$(eval echo "$repo_path")  # Expand ~ (home directory)
+
+    # Validate that the directory exists
+    if [[ ! -d "$repo_path" ]]; then
+        echo
+        echo "❌ Error: Directory '$repo_path' does not exist."
+        return 1
+    fi
+
+    # Validate that it's a Git repository
+    if [[ ! -d "$repo_path/.git" ]]; then
+        echo
+        echo "❌ Error: '$repo_path' is not a valid Git repository."
+        return 1
+    fi
+
+    # Move into the repository directory
+    cd "$repo_path" || { echo "❌ Error: Failed to enter directory '$repo_path'"; return 1; }
+
+    # Fetch latest remote branches
+    echo
+    echo "🔄 Fetching the latest remote branches..."
+    git fetch --prune
+    
+    # List all local branches
+    echo
+    echo "🔎 Local branches in this repository:"
+    git branch
+    echo
+
+    # List all remote branches
+    echo
+    echo "🔎 Remote branches in this repository:"
+    git branch -r
+    echo
+
+    # Get current branch name
+    current_branch=$(git rev-parse --abbrev-ref HEAD)
+
+    # Find local branches that no longer have a remote
+    echo "🔎 Checking for local branches without a remote counterpart..."
+    untracked_branches=($(git branch --format "%(refname:short)" | while read -r branch; do
+        if ! git ls-remote --exit-code --heads origin "$branch" > /dev/null 2>&1; then
+            echo "$branch"
+        fi
+    done))
+
+    # If no untracked branches exist, exit
+    if [[ ${#untracked_branches[@]} -eq 0 ]]; then
+        echo
+        echo "✅ No local branches found without a remote counterpart."
+        return 0
+    fi
+
+    # Prompt the user for deletion
+    echo
+    echo "⚠️ The following local branches have no remote counterpart:"
+    for branch in "${untracked_branches[@]}"; do
+        echo
+        read -rp "Delete local branch '$branch'? (y/n): " confirm
+        if [[ "$confirm" == "y" ]]; then
+            if [[ "$branch" == "$current_branch" ]]; then
+                echo
+                echo "⚠️ Cannot delete the currently checked-out branch '$branch'. Switching to 'master' first..."
+                git checkout master || git checkout main
+            fi
+            git branch -D "$branch"
+            echo
+            echo "✅ Deleted local branch '$branch'."
+        else
+            echo
+            echo "❌ Skipping deletion of '$branch'."
+        fi
+    done
+    echo
+    echo "🎉 Cleanup complete!"
+}
+
+
 main_program() {
   while true; do
     echo " "
@@ -658,7 +741,8 @@ main_program() {
     echo "20. Delete Remote branch"
     echo "21. Delete Remote Repo"
     echo "22. Show remote branch"
-    echo "23. <--- Back to Initial menu"
+    echo "23. Delete untracked branches - Deletes LOCAL branches, which do not have remotes"
+    echo "24. <--- Back to Initial menu"
     echo " "
     echo "-------------------------------------------"
     echo " "
@@ -870,7 +954,7 @@ main_program() {
             read -p "Press enter to return to the menu: " enter
             ;;
         21)
-			      delete_remote_repo
+			delete_remote_repo
             ;;
         22) echo " "
             read -p "Enter remote branch name to show: " show_remote_branch
@@ -879,7 +963,13 @@ main_program() {
             echo " "
             read -p "Press enter to return to the menu: " enter
             ;;
+            
         23)
+			delete_untracked_branches
+            echo " "
+            read -p "Press enter to return to the menu: " enter
+            ;;
+        24)
             check_and_initialize_repository
             ;;
         *)
