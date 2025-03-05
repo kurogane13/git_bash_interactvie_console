@@ -481,6 +481,136 @@ function delete_local_branch() {
     read -p "Press enter to return to the menu: "
 }
 
+delete_remote_branch() {
+    # Prompt for the repository directory
+    echo
+    read -rp "Enter the path to the Git repository: " repo_path
+
+    # Validate that the directory exists
+    if [[ ! -d "$repo_path" ]]; then
+        echo "❌ Error: Directory '$repo_path' does not exist."
+        return 1
+    fi
+
+    # Validate that the directory is a Git repository
+    if [[ ! -d "$repo_path/.git" ]]; then
+        echo "❌ Error: '$repo_path' is not a valid Git repository."
+        return 1
+    fi
+
+    # Move into the repository directory
+    cd "$repo_path" || { echo "❌ Error: Failed to enter directory '$repo_path'"; return 1; }
+	echo
+    # Prompt for the branch name
+    echo "Enter the remote branch name to delete."
+    echo "Example syntax: 'repo_name/branch_name' (as seen in 'git branch -r', but without 'origin/')"
+    echo
+    read -rp "Remote branch name: " remote_branch_name
+
+    # Extract only the branch name (remove repo prefix)
+    branch_name="${remote_branch_name#*/}"
+	echo
+    # Fetch latest remote branches
+    git fetch origin --prune
+
+    # List available branches for validation
+    echo "🔎 Checking existing branches..."
+    echo
+    git branch -r
+    git branch
+
+    # Check if the local branch exists
+    if git show-ref --verify --quiet "refs/heads/$branch_name"; then
+        echo
+        echo "✅ Local branch '$branch_name' exists."
+    else
+        echo
+        echo "⚠️ Warning: Local branch '$branch_name' does not exist. Checking remotely..."
+    fi
+
+    # Check if the remote branch exists
+    if git branch -r | grep -qE "^\s*origin/$branch_name\$"; then
+        # Confirmation prompt
+        echo
+        read -rp "Are you sure you want to delete the remote branch 'origin/$branch_name'? (y/n): " confirmation
+        if [[ "$confirmation" == "y" ]]; then
+            # Delete the remote branch
+            git push origin --delete "$branch_name"
+            echo
+            echo "✅ Remote branch 'origin/$branch_name' has been deleted."
+        else
+            echo
+            echo "❌ Operation canceled."
+        fi
+    else
+        echo
+        echo "⚠️ Error: Remote branch 'origin/$branch_name' does not exist."
+        echo
+        echo "Make sure you have entered the correct branch name as seen in 'git branch -r'."
+    fi
+}
+
+create_remote_branch() {
+    # Prompt for the repository directory
+    echo
+    read -rp "Enter the path to the Git repository: " repo_path
+
+    # Validate that the directory exists
+    if [[ ! -d "$repo_path" ]]; then
+        echo
+        echo "❌ Error: Directory '$repo_path' does not exist."
+        return 1
+    fi
+
+    # Validate that the directory is a Git repository
+    if [[ ! -d "$repo_path/.git" ]]; then
+        echo
+        echo "❌ Error: '$repo_path' is not a valid Git repository."
+        return 1
+    fi
+
+    # Move into the repository directory
+    cd "$repo_path" || { echo "❌ Error: Failed to enter directory '$repo_path'"; return 1; }
+
+    # Ensure the repository has a remote named 'origin'
+    if ! git remote get-url origin > /dev/null 2>&1; then
+        echo
+        echo "❌ Error: No remote repository found. Ensure 'origin' is set up."
+        return 1
+    fi
+
+    # Fetch the latest remote branches
+    git fetch origin --prune
+
+    # Prompt for the new branch name
+    echo
+    echo "Enter the name of the new remote branch."
+    read -rp "New branch name: " branch_name
+
+    # Check if the branch already exists locally
+    if git show-ref --verify --quiet "refs/heads/$branch_name"; then
+        echo
+        echo "⚠️ Error: Local branch '$branch_name' already exists."
+        return 1
+    fi
+
+    # Check if the branch already exists remotely
+    if git branch -r | grep -qE "^\s*origin/$branch_name\$"; then
+        echo
+        echo "⚠️ Error: Remote branch 'origin/$branch_name' already exists."
+        return 1
+    fi
+
+    # Create the local branch
+    git checkout -b "$branch_name"
+
+    # Push the new branch to the remote repository
+    echo
+    git push -u origin "$branch_name"
+    echo
+    echo "✅ Remote branch 'origin/$branch_name' has been created successfully."
+}
+
 main_program() {
   while true; do
     echo " "
@@ -502,16 +632,18 @@ main_program() {
     echo "9. Git show"
     echo "10. Merge branches"
     echo "11. Create Local Branch"
-    echo "12. Create Remote Repo"
-    echo "13. Add Files"
-    echo "14. Commit"
-    echo "15. Pull from Remote Repo"
-    echo "16. Push to Remote repo"
-    echo "17. Delete Local Branch"
-    echo "18. Delete ALL Local Branches"
-    echo "19. Delete Remote Repo"
-    echo "20. Show remote branch"
-    echo "21. <--- Back to Initial menu"
+    echo "11. Create Remote Branch"
+    echo "13. Create Remote Repo"
+    echo "14. Add Files"
+    echo "15. Commit"
+    echo "16. Pull from Remote Repo"
+    echo "17. Push to Remote repo"
+    echo "18. Delete Local Branch"
+    echo "19. Delete ALL Local Branches"
+    echo "20. Delete Remote branch"
+    echo "21. Delete Remote Repo"
+    echo "22. Show remote branch"
+    echo "23. <--- Back to Initial menu"
     echo " "
     echo "-------------------------------------------"
     echo " "
@@ -617,10 +749,10 @@ main_program() {
         11)
             create_local_branch
             ;;
-        12)
+        13)
 			create_remote_repo
             ;;
-        13)
+        14)
             echo " "
             echo "Working on path/repo: "$PWD
             echo " "
@@ -651,7 +783,7 @@ main_program() {
                 read -p "Press enter to return to the menu: " enter
             fi
             ;;
-        14)
+        15)
             echo " "
             echo "Working on path/repo: "$PWD
             echo " "
@@ -662,17 +794,17 @@ main_program() {
             echo " "
             read -p "Press enter to return to the menu: " enter
             ;;
-        15)
+        16)
             pull_from_remote
             ;;
-        16)
+        17)
             push_to_remote
             ;;
-        17)
+        18)
 			delete_local_branch
             ;;
             
-	    18)
+	    19)
 	        echo " "
             echo "Working on path/repo: "$PWD
             echo " "
@@ -709,17 +841,23 @@ main_program() {
             echo " "
             read -p "Press enter to return to the menu: " enter
             ;;
-        19)
-			delete_remote_repo
+
+        20)
+            delete_remote_branch
+            echo " "
+            read -p "Press enter to return to the menu: " enter
             ;;
-        20) echo " "
+        21)
+			      delete_remote_repo
+            ;;
+        22) echo " "
             read -p "Enter remote branch name to show: " show_remote_branch
             echo " "
             gh repo view $show_remote_branch
             echo " "
             read -p "Press enter to return to the menu: " enter
             ;;
-        21)
+        23)
             check_and_initialize_repository
             ;;
         *)
