@@ -484,19 +484,28 @@ function delete_local_branch() {
 delete_remote_branch() {
     # Prompt for the repository directory
     echo
-    read -rp "Enter the path to the Git repository: " repo_path
+	# Prompt the user for the repository path, default to current directory if empty
+	read -rp "Enter the path to the Git repository (Press Enter to use current directory): " repo_path
+	repo_path=${repo_path:-$PWD}  # Use current directory if input is empty
 
-    # Validate that the directory exists
-    if [[ ! -d "$repo_path" ]]; then
-        echo "❌ Error: Directory '$repo_path' does not exist."
-        return 1
-    fi
+	# Print the selected repo path
+	echo "Using repository path: $repo_path"
 
-    # Validate that the directory is a Git repository
-    if [[ ! -d "$repo_path/.git" ]]; then
-        echo "❌ Error: '$repo_path' is not a valid Git repository."
-        return 1
-    fi
+	# Validate that the directory exists
+	if [[ ! -d "$repo_path" ]]; then
+		echo "❌ Error: Directory '$repo_path' does not exist."
+		exit 1
+	fi
+
+	# Validate that it's a Git repository
+	if [[ ! -d "$repo_path/.git" ]]; then
+		echo "❌ Error: '$repo_path' is not a valid Git repository."
+		exit 1
+	fi
+
+	echo "✅ '$repo_path' is a valid Git repository!"
+	echo
+	git branch -r
 
     # Move into the repository directory
     cd "$repo_path" || { echo "❌ Error: Failed to enter directory '$repo_path'"; return 1; }
@@ -553,21 +562,27 @@ delete_remote_branch() {
 create_remote_branch() {
     # Prompt for the repository directory
     echo
-    read -rp "Enter the path to the Git repository: " repo_path
 
-    # Validate that the directory exists
-    if [[ ! -d "$repo_path" ]]; then
-        echo
-        echo "❌ Error: Directory '$repo_path' does not exist."
-        return 1
-    fi
+	# Prompt the user for the repository path, default to current directory if empty
+	read -rp "Enter the path to the Git repository (Press Enter to use current directory): " repo_path
+	repo_path=${repo_path:-$PWD}  # Use current directory if input is empty
 
-    # Validate that the directory is a Git repository
-    if [[ ! -d "$repo_path/.git" ]]; then
-        echo
-        echo "❌ Error: '$repo_path' is not a valid Git repository."
-        return 1
-    fi
+	# Print the selected repo path
+	echo "Using repository path: $repo_path"
+
+	# Validate that the directory exists
+	if [[ ! -d "$repo_path" ]]; then
+		echo "❌ Error: Directory '$repo_path' does not exist."
+		exit 1
+	fi
+
+	# Validate that it's a Git repository
+	if [[ ! -d "$repo_path/.git" ]]; then
+		echo "❌ Error: '$repo_path' is not a valid Git repository."
+		exit 1
+	fi
+
+	echo "✅ '$repo_path' is a valid Git repository!"
 
     # Move into the repository directory
     cd "$repo_path" || { echo "❌ Error: Failed to enter directory '$repo_path'"; return 1; }
