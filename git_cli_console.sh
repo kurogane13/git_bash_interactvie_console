@@ -323,6 +323,8 @@ function push_to_remote() {
 function create_local_branch() {
     echo
     read -p "Enter the path to the local repository: " repo_dir
+    repo_dir=${repo_dir:-$PWD}  # Default to current directory if empty
+    repo_dir=$(eval echo "$repo_dir")  # Expand ~ (home directory)
 
     # Check if the directory exists
     if [[ ! -d "$repo_dir" ]]; then
@@ -387,6 +389,8 @@ function create_local_branch() {
 function delete_local_branch() {
     echo
     read -p "Enter the path to the local repository: " repo_dir
+    repo_dir=${repo_dir:-$PWD}  # Default to current directory if empty
+    repo_dir=$(eval echo "$repo_dir")  # Expand ~ (home directory)
 
     # Ensure the provided path exists
     if [[ ! -d "$repo_dir" ]]; then
