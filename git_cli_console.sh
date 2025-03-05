@@ -632,7 +632,7 @@ main_program() {
     echo "9. Git show"
     echo "10. Merge branches"
     echo "11. Create Local Branch"
-    echo "11. Create Remote Branch"
+    echo "12. Create Remote Branch"
     echo "13. Create Remote Repo"
     echo "14. Add Files"
     echo "15. Commit"
@@ -749,6 +749,13 @@ main_program() {
         11)
             create_local_branch
             ;;
+            
+        12)
+            create_remote_branch
+            echo " "
+            read -p "Press enter to return to the menu: " enter
+            ;;
+            
         13)
 			create_remote_repo
             ;;
