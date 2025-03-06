@@ -1072,14 +1072,14 @@ menu() {
         echo -e "🌟 GitHub Activity Tracker 🌟"
         echo -e "======================================${NC}\n"
 
-        echo -e "${YELLOW}1️⃣ Query all repositories for a user${NC}"
-        echo -e "${YELLOW}2️⃣ Query a specific repository${NC}"
-        echo -e "${YELLOW}3️⃣ View log files${NC}"
-        echo -e "${YELLOW}4️⃣ Search for a pattern in a log file${NC}"
-        echo -e "${YELLOW}5️⃣ Delete a specific log file${NC}"
-        echo -e "${YELLOW}6️⃣ Delete all log files${NC}"
-        echo -e "${YELLOW}7️⃣ Generate a futuristic HTML report from a log file${NC}\n"
-        echo -e "${YELLOW}8️⃣ Exit${NC}\n"
+        echo -e "${YELLOW}1 - Query all repositories for a user${NC}"
+        echo -e "${YELLOW}2 - Query a specific repository${NC}"
+        echo -e "${YELLOW}3 - View log files${NC}"
+        echo -e "${YELLOW}4 - Search for a pattern in a log file${NC}"
+        echo -e "${YELLOW}5 - Delete a specific log file${NC}"
+        echo -e "${YELLOW}6 - Delete all log files${NC}"
+        echo -e "${YELLOW}7 - Generate a futuristic HTML report from a log file${NC}\n"
+        echo -e "${YELLOW}8 - Back to initialize menu${NC}\n"
 
         read -p "🔹 Select an option (1-7): " CHOICE
         echo ""
@@ -1092,7 +1092,7 @@ menu() {
             5) delete_log ;;
             6) delete_all_logs ;;
             7) generate_html_report ;;
-            8) echo -e "${GREEN}👋 Exiting...${NC}\n"; exit 0 ;;
+            8) check_and_initialize_repository ;;
             *) echo -e "${RED}❌ Invalid option. Try again.${NC}\n" ;;
         esac
     done
