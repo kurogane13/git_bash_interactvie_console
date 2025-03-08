@@ -44,51 +44,79 @@ function delete_remote_repo() {
 }
 
 function create_remote_repo() {
-    echo " "
-    echo "Working on path/repo: $PWD"
     echo
-    eval "$(ssh-agent -s)"
-	ssh-add -D
+    echo "🔍 Checking working directory: $PWD"
+    echo
+
+    # Prompt user for repository name
     read -p "Provide the name of the repo you want to create: " repo_name
 
     if [[ -d "$repo_name" ]]; then
         echo
-        echo "Repo '$repo_name' already exists."
+        echo "⚠️ Repo '$repo_name' already exists."
 
         if [[ -d "$repo_name/.git" ]]; then
             echo
-            echo "Repo '$repo_name' is already initialized."
+            echo "✅ Repo '$repo_name' is already initialized."
             echo
-            read -p "You cannot create this repo, because it already exists. Press enter to return to the main menu: " enter
+            read -p "You cannot create this repo because it already exists. Press Enter to return to the main menu: " enter
             main_program
         else
-            echo "Directory exists but is not a Git repo. Initializing..."
+            echo "📂 Directory exists but is not a Git repo. Initializing..."
             cd "$repo_name" || exit
             git init
         fi
     else
         echo
-        echo "Creating local directory '$repo_name'..."
-        mkdir -p "$repo_name"
-        cd "$repo_name" || exit
+        echo "⚠️ This directory does not exist."
         echo
-        echo "Initializing new Git repository in '$repo_name'..."
-        git init
+        while true; do
+          echo
+          echo "1 - Create the directory with $PWD/$repo_name"
+          echo "2 - Return to the main program menu"
+          echo
+          read -p "Provide an operation numner to proceed: " choice
+          case $choice in
+            1)
+              echo "Creating directory: $PWD/$repo_name"
+              mkdir $PWD/$repo_name
+              cd $PWD/$repo_name
+              echo
+              echo "Initializing Git repo in $PWD/$repo_name"
+              git init
+              break
+              ;;
+            2)
+              main_program
+              ;;
+            *)
+              echo
+              echo "❌ Invalid choice. Please enter 1 or 2."
+              ;;
+          esac
+        done
     fi
+
+    # Prompt for GitHub username
+    echo
+    read -p "Enter the GitHub account to create the repo under: " github_user
+
+    # Validate input
+    if [[ -z "$github_user" ]]; then
+        echo "❌ Error: GitHub account name cannot be empty."
+        return 1
+    fi
+
+    # Run the remote URLs manager before creating the repo
+    remote_urls_manager
 
     # Detect default branch name (master or main)
-    default_branch=$(git symbolic-ref --short HEAD 2>/dev/null)
-    if [[ -z "$default_branch" ]]; then
-        default_branch="master"  # Fallback to master
-    fi
+    default_branch=$(git symbolic-ref --short HEAD 2>/dev/null || echo "master")
 
-	# Extract GitHub username dynamically
-    github_user=$(ssh -T git@github.com 2>&1 | grep -oP "(?<=Hi ).*?(?=! You've successfully)")
-
-    if [[ -z "$github_user" ]]; then
-        echo "Failed to determine GitHub username. Ensure you have SSH access configured."
-        echo
-        read -p "Press enter to return to the menu: "
+    # Check if the repository already exists on GitHub
+    if gh repo view "$github_user/$repo_name" &>/dev/null; then
+        echo "⚠️ Repository '$repo_name' already exists under '$github_user'."
+        read -p "Press Enter to return to the menu: "
         return
     fi
 
@@ -111,7 +139,7 @@ Feel free to modify and expand upon it as needed.
 
 1. Clone this repository:
    \`\`\`bash
-   git clone https://github.com/$github_user/$repo_name.git
+   git clone git@github.com:$github_user/$repo_name.git
    \`\`\`
 2. Navigate into the directory:
    \`\`\`bash
@@ -125,10 +153,25 @@ EOF
     git add README.md
     git commit -m "Initial commit"
 
+    # Display the final remote URLs before proceeding
+    echo
+    echo "📡 Final remote URLs set for this repository:"
+    git remote -v
+    echo
+
+    # Confirm repository creation
+    gh auth status
+    echo
+    read -p "Proceed with creating the remote repository under '$github_user'? (y/n): " confirm
+    if [[ $confirm != "y" && $confirm != "Y" ]]; then
+        echo "❌ Repository creation aborted."
+        return
+    fi
+
     # Create the remote repository on GitHub
     echo
-    echo "Creating GitHub repository '$repo_name'..."
-    gh repo create "$repo_name" --public --source=. --remote=upstream
+    echo "🔧 Creating GitHub repository '$repo_name' under '$github_user'..."
+    gh repo create "$github_user/$repo_name" --public --source=. --remote=upstream
 
     # Construct the correct remote repository URL
     remote_url="git@github.com:$github_user/$repo_name.git"
@@ -138,11 +181,11 @@ EOF
 
     # Push the initial commit using the correct branch
     echo
-    echo "Pushing initial commit to '$remote_url'..."
+    echo "🚀 Pushing initial commit to '$remote_url'..."
     git push -u origin "$default_branch"
 
     echo " "
-    read -p "Press enter to return to the menu: "
+    read -p "Press Enter to return to the menu: "
 }
 
 function git_configure_account() {
@@ -712,6 +755,95 @@ delete_untracked_branches() {
     echo "🎉 Cleanup complete!"
 }
 
+function remote_urls_manager() {
+  while true; do
+    echo
+    echo "----------------------------------------"
+    echo " Git Remote URLs Manager"
+    echo "----------------------------------------"
+    echo ""
+    echo "📂 Working on repo: $PWD"
+    echo ""
+    echo "🔍 Current working branch:"
+    git branch
+    echo ""
+    echo "🌐 Listing remote URLs (fetch & push):"
+    git remote -v
+    echo ""
+
+    echo "✅ Examples of correct remote URL formats:"
+    echo " - SSH:   git@github.com:your-username/repository.git"
+    echo " - HTTPS: https://github.com/your-username/repository.git"
+    echo ""
+
+    echo "Options:"
+    echo "1) Change 'origin' URL"
+    echo "2) Change 'upstream' URL"
+    echo "3) Keep URLs and exit"
+    echo ""
+    read -p "Select an option (1/2/3): " option
+
+    case $option in
+        1)
+            echo
+            read -p "Enter the new 'origin' URL: " new_origin
+            if [[ "$new_origin" =~ ^(git@github.com:|https://github.com/) ]]; then
+                echo
+                read -p "Are you sure you want to update 'origin' to $new_origin? (y/n): " confirm
+                if [[ $confirm == "y" || $confirm == "Y" ]]; then
+                    if git remote get-url origin &>/dev/null; then
+                        git remote set-url origin "$new_origin"
+                    else
+                        git remote add origin "$new_origin"
+                    fi
+                    echo
+                    echo "✅ Origin URL updated successfully!"
+                else
+                    echo
+                    echo "⚠️ No changes made."
+                fi
+            else
+                echo
+                echo "❌ Error: Invalid repository URL. Must be SSH or HTTPS format."
+            fi
+            ;;
+        2)
+            echo
+            read -p "Enter the new 'upstream' URL: " new_upstream
+            if [[ "$new_upstream" =~ ^(git@github.com:|https://github.com/) ]]; then
+                echo
+                read -p "Are you sure you want to update 'upstream' to $new_upstream? (y/n): " confirm
+                if [[ $confirm == "y" || $confirm == "Y" ]]; then
+                    if git remote get-url upstream &>/dev/null; then
+                        git remote set-url upstream "$new_upstream"
+                    else
+                        git remote add upstream "$new_upstream"
+                    fi
+                    echo
+                    echo "✅ Upstream URL updated successfully!"
+                else
+                    echo
+                    echo "⚠️ No changes made."
+                fi
+            else
+                echo
+                echo "❌ Error: Invalid repository URL. Must be SSH or HTTPS format."
+            fi
+            ;;
+        3)
+            echo
+            echo "✅ Keeping current URLs and exiting..."
+            break
+            ;;
+        *)
+            echo
+            echo "⚠️ Invalid option. Press Enter to return to the menu."
+            read
+            ;;
+    esac
+  done
+}
+
 function git_stats() {
 
 # Define Colors
@@ -1178,17 +1310,7 @@ main_program() {
             read -p "Press enter to return to the menu: " enter
             ;;
         6)
-            echo " "
-            echo "Working on path/repo: "$PWD
-            echo " "
-            echo "Current working branch: "
-            git branch
-            echo " "
-            echo "Listing remote urls - fetch push"
-            echo " "
-            git remote -v
-            echo " "
-            read -p "Press enter to return to the menu: " enter
+            remote_urls_manager
             ;;
         7)
             echo " "
@@ -1249,7 +1371,7 @@ main_program() {
             ;;
 
         13)
-			create_remote_repo
+			      create_remote_repo
             ;;
         14)
             echo " "
