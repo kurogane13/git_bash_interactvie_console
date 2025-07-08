@@ -6,7 +6,7 @@
 - A command-line interface (CLI) tool for managing Git and GitHub operations efficiently. 
 - This tool simplifies the process of working with Git repositories, handling everything from authentication and branch management to commits, pushes, and merges.
 
-## Upgraded Version release: 02/26/2025
+## Upgraded Version release: 07/08/2025
 
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -94,6 +94,31 @@
 ### Major Enhancements and New Features
 
 The original `git_cli_console.sh` has been completely redesigned and enhanced into `git-workflow-manager.sh` - a more robust, user-friendly, and feature-rich version 2.0 of the tool.
+
+### 🔐 **Security Enhancement: Local PAT Storage**
+
+**Important Security Update**: Version 2.0 now stores GitLab Personal Access Tokens (PATs) securely in local files instead of hardcoding them in the script.
+
+#### **PAT Management Features:**
+- **Secure Storage**: PATs are stored in `~/.gitlab_pat` with restricted permissions (600)
+- **Easy Management**: Add, validate, and remove PATs through the GitLab Authentication menu
+- **Automatic Validation**: PATs are automatically validated when stored
+- **Safe Removal**: Confirmation prompts before removing stored PATs
+
+#### **How to Set Up Your GitLab PAT:**
+1. Generate a PAT at: https://gitlab.com/-/user_settings/personal_access_tokens
+2. Required scopes: `api`, `read_user`, `read_repository`
+3. Use the GitLab Authentication menu (option 7) to store your PAT:
+   - **Option 3**: Save new GitLab PAT (enter and store PAT for future use)
+   - **Option 5**: Generate new GitLab PAT (opens GitLab in browser for easy creation)
+4. The tool will validate and securely store your PAT for future use
+
+#### **Enhanced GitLab Menu Features:**
+- **Dynamic Status Display**: Shows whether a PAT is currently stored
+- **Clear Option Descriptions**: Each option clearly indicates its purpose
+- **Intelligent Guidance**: Menu adapts based on whether a PAT is stored
+- **One-Time Validation**: Option 4 allows testing PATs without storing them
+- **Safe Replacement**: Option 3 confirms before replacing existing PATs
 
 ---
 
